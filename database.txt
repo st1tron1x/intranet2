@@ -1,0 +1,338 @@
+-- Base de datos completa para la intranet
+CREATE DATABASE IF NOT EXISTS intranet CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE intranet;
+
+-- Tabla de usuarios (actualizada con seguridad)
+CREATE TABLE usuarios (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    usuario VARCHAR(50) UNIQUE NOT NULL,
+    clave VARCHAR(255) NOT NULL, -- Para password_hash
+    admin TINYINT(1) DEFAULT 0,
+    nombre_completo VARCHAR(100),
+    email VARCHAR(100),
+    telefono VARCHAR(20),
+    cargo VARCHAR(100),
+    departamento VARCHAR(100),
+    fecha_ingreso DATE,
+    foto_perfil VARCHAR(255),
+    activo TINYINT(1) DEFAULT 1,
+    ultimo_login TIMESTAMP NULL,
+    intentos_login INT DEFAULT 0,
+    bloqueado_hasta TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Tabla de categorías (existente, mejorada)
+CREATE TABLE categorias (
+    ID_Categoria INT PRIMARY KEY AUTO_INCREMENT,
+    categoria VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    ruta VARCHAR(255),
+    icono VARCHAR(50) DEFAULT 'folder',
+    orden INT DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de permisos (existente)
+CREATE TABLE permisos (
+    usuario VARCHAR(50),
+    ID_Categoria INT,
+    PRIMARY KEY (usuario, ID_Categoria),
+    FOREIGN KEY (usuario) REFERENCES usuarios(usuario) ON DELETE CASCADE,
+    FOREIGN KEY (ID_Categoria) REFERENCES categorias(ID_Categoria) ON DELETE CASCADE
+);
+
+-- Tabla de noticias
+CREATE TABLE noticias (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    contenido TEXT NOT NULL,
+    imagen VARCHAR(255),
+    fecha_publicacion DATE NOT NULL,
+    estado ENUM('activo', 'inactivo') DEFAULT 'activo',
+    autor VARCHAR(50),
+    views INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (autor) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+-- Tabla de categorías de documentos
+CREATE TABLE categorias_documentos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    icono VARCHAR(50) DEFAULT 'file',
+    color VARCHAR(7) DEFAULT '#007bff',
+    orden INT DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de documentos
+CREATE TABLE documentos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    categoria_id INT,
+    nombre_archivo VARCHAR(255) NOT NULL,
+    archivo_original VARCHAR(255) NOT NULL,
+    tipo_archivo VARCHAR(10) NOT NULL,
+    tamaño INT NOT NULL,
+    usuario_subida VARCHAR(50),
+    version VARCHAR(20) DEFAULT '1.0',
+    tags TEXT,
+    descargas INT DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (categoria_id) REFERENCES categorias_documentos(id) ON DELETE SET NULL,
+    FOREIGN KEY (usuario_subida) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+-- Tabla de solicitudes (mejorada)
+CREATE TABLE solicitudes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    usuario VARCHAR(50) NOT NULL,
+    tipo ENUM('vacaciones', 'certificado_laboral', 'soporte_tecnico', 'reserva_sala', 'mantenimiento', 'papeleria', 'permiso') NOT NULL,
+    titulo VARCHAR(200),
+    motivo TEXT NOT NULL,
+    fecha_inicio DATE NULL,
+    fecha_fin DATE NULL,
+    correo_notificacion VARCHAR(100),
+    estado ENUM('pendiente', 'en_proceso', 'aprobada', 'rechazada', 'completada') DEFAULT 'pendiente',
+    prioridad ENUM('baja', 'media', 'alta', 'critica') DEFAULT 'media',
+    comentarios_admin TEXT,
+    fecha_respuesta TIMESTAMP NULL,
+    respondido_por VARCHAR(50) NULL,
+    archivos_adjuntos JSON,
+    fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario) REFERENCES usuarios(usuario) ON DELETE CASCADE,
+    FOREIGN KEY (respondido_por) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+-- Tabla de reservas de salas
+CREATE TABLE salas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    capacidad INT,
+    equipamiento JSON,
+    activo TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE reservas_salas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    sala_id INT NOT NULL,
+    usuario VARCHAR(50) NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    fecha_inicio DATETIME NOT NULL,
+    fecha_fin DATETIME NOT NULL,
+    estado ENUM('pendiente', 'confirmada', 'cancelada') DEFAULT 'confirmada',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (sala_id) REFERENCES salas(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario) REFERENCES usuarios(usuario) ON DELETE CASCADE
+);
+
+-- Tabla de eventos/calendario corporativo
+CREATE TABLE eventos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    tipo ENUM('cumpleanos', 'capacitacion', 'reunion', 'festivo', 'corporativo') NOT NULL,
+    fecha_inicio DATETIME NOT NULL,
+    fecha_fin DATETIME,
+    todo_el_dia TINYINT(1) DEFAULT 0,
+    color VARCHAR(7) DEFAULT '#007bff',
+    visible_para JSON, -- Array de usuarios o departamentos
+    creado_por VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creado_por) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+-- Tabla de capacitaciones
+CREATE TABLE capacitaciones (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    categoria VARCHAR(100),
+    tipo ENUM('video', 'documento', 'evaluacion', 'presencial') NOT NULL,
+    archivo VARCHAR(255),
+    url_externa VARCHAR(500),
+    duracion_minutos INT,
+    obligatoria TINYINT(1) DEFAULT 0,
+    orden INT DEFAULT 0,
+    activo TINYINT(1) DEFAULT 1,
+    creado_por VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creado_por) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+-- Tabla de progreso de capacitaciones
+CREATE TABLE capacitaciones_progreso (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    capacitacion_id INT NOT NULL,
+    usuario VARCHAR(50) NOT NULL,
+    completada TINYINT(1) DEFAULT 0,
+    progreso_porcentaje DECIMAL(5,2) DEFAULT 0.00,
+    tiempo_dedicado INT DEFAULT 0, -- minutos
+    fecha_inicio TIMESTAMP NULL,
+    fecha_completada TIMESTAMP NULL,
+    calificacion DECIMAL(3,2) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (capacitacion_id) REFERENCES capacitaciones(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario) REFERENCES usuarios(usuario) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_training (usuario, capacitacion_id)
+);
+
+-- Tabla de foros
+CREATE TABLE foros (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    categoria VARCHAR(100),
+    activo TINYINT(1) DEFAULT 1,
+    orden INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE foros_temas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    foro_id INT NOT NULL,
+    titulo VARCHAR(200) NOT NULL,
+    contenido TEXT NOT NULL,
+    autor VARCHAR(50) NOT NULL,
+    fijado TINYINT(1) DEFAULT 0,
+    cerrado TINYINT(1) DEFAULT 0,
+    views INT DEFAULT 0,
+    respuestas INT DEFAULT 0,
+    ultima_respuesta TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (foro_id) REFERENCES foros(id) ON DELETE CASCADE,
+    FOREIGN KEY (autor) REFERENCES usuarios(usuario) ON DELETE CASCADE
+);
+
+CREATE TABLE foros_respuestas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tema_id INT NOT NULL,
+    contenido TEXT NOT NULL,
+    autor VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (tema_id) REFERENCES foros_temas(id) ON DELETE CASCADE,
+    FOREIGN KEY (autor) REFERENCES usuarios(usuario) ON DELETE CASCADE
+);
+
+-- Tabla de encuestas
+CREATE TABLE encuestas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    anonima TINYINT(1) DEFAULT 0,
+    activa TINYINT(1) DEFAULT 1,
+    creado_por VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creado_por) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+CREATE TABLE encuestas_preguntas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    encuesta_id INT NOT NULL,
+    pregunta TEXT NOT NULL,
+    tipo ENUM('multiple', 'unica', 'texto', 'escala') NOT NULL,
+    opciones JSON,
+    requerida TINYINT(1) DEFAULT 1,
+    orden INT DEFAULT 0,
+    FOREIGN KEY (encuesta_id) REFERENCES encuestas(id) ON DELETE CASCADE
+);
+
+CREATE TABLE encuestas_respuestas (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    pregunta_id INT NOT NULL,
+    usuario VARCHAR(50),
+    respuesta TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (pregunta_id) REFERENCES encuestas_preguntas(id) ON DELETE CASCADE,
+    FOREIGN KEY (usuario) REFERENCES usuarios(usuario) ON DELETE CASCADE
+);
+
+-- Tabla de reconocimientos
+CREATE TABLE reconocimientos (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    titulo VARCHAR(200) NOT NULL,
+    descripcion TEXT,
+    usuario_reconocido VARCHAR(50) NOT NULL,
+    otorgado_por VARCHAR(50) NOT NULL,
+    tipo ENUM('empleado_mes', 'logro', 'aniversario', 'cumpleanos', 'otro') NOT NULL,
+    publico TINYINT(1) DEFAULT 1,
+    fecha_reconocimiento DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_reconocido) REFERENCES usuarios(usuario) ON DELETE CASCADE,
+    FOREIGN KEY (otorgado_por) REFERENCES usuarios(usuario) ON DELETE CASCADE
+);
+
+-- Tabla de logs de auditoría
+CREATE TABLE audit_logs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    usuario VARCHAR(50),
+    accion VARCHAR(100) NOT NULL,
+    tabla_afectada VARCHAR(100),
+    registro_id INT,
+    datos_anteriores JSON,
+    datos_nuevos JSON,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario) REFERENCES usuarios(usuario) ON DELETE SET NULL
+);
+
+-- Tabla de configuración del sistema
+CREATE TABLE configuracion (
+    clave VARCHAR(100) PRIMARY KEY,
+    valor TEXT,
+    descripcion TEXT,
+    tipo ENUM('string', 'number', 'boolean', 'json') DEFAULT 'string',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Datos iniciales
+INSERT INTO usuarios (usuario, clave, admin, nombre_completo, email, cargo, departamento) VALUES
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1, 'Administrador', 'admin@correagro.com', 'Administrador de Sistema', 'IT');
+
+INSERT INTO categorias (categoria, descripcion, ruta, icono) VALUES
+('Noticias', 'Noticias y comunicados internos', 'noticias.php', 'newspaper-o'),
+('Documentos', 'Biblioteca de documentos', 'documentos.php', 'folder-open'),
+('Solicitudes', 'Sistema de solicitudes', 'solicitudes.php', 'file-text'),
+('Capacitación', 'Formación y desarrollo', 'capacitaciones.php', 'graduation-cap'),
+('Recursos Humanos', 'Gestión de personal', 'rrhh.php', 'users');
+
+INSERT INTO categorias_documentos (nombre, descripcion, icono, color) VALUES
+('Manuales', 'Manuales de usuario y procedimientos', 'book', '#28a745'),
+('Políticas', 'Políticas corporativas y reglamentos', 'gavel', '#dc3545'),
+('Formatos', 'Plantillas y formatos corporativos', 'file-text-o', '#17a2b8'),
+('Contabilidad', 'Documentos contables y financieros', 'calculator', '#ffc107');
+
+INSERT INTO salas (nombre, descripcion, capacidad, equipamiento) VALUES
+('Sala de Juntas', 'Sala principal para reuniones ejecutivas', 12, '["Proyector", "Audio", "Video conferencia", "Pizarra"]'),
+('Sala de Capacitación', 'Espacio para entrenamientos y talleres', 20, '["Proyector", "Audio", "Computadores"]');
+
+INSERT INTO configuracion (clave, valor, descripcion, tipo) VALUES
+('empresa_nombre', 'Correagro SCB', 'Nombre de la empresa', 'string'),
+('empresa_email', 'info@correagro.com', 'Email principal de la empresa', 'string'),
+('max_file_size', '10485760', 'Tamaño máximo de archivo en bytes (10MB)', 'number'),
+('session_timeout', '3600', 'Tiempo de sesión en segundos', 'number');
+
+-- Índices para optimización
+CREATE INDEX idx_usuarios_activo ON usuarios(activo);
+CREATE INDEX idx_noticias_estado_fecha ON noticias(estado, fecha_publicacion);
+CREATE INDEX idx_documentos_categoria ON documentos(categoria_id, activo);
+CREATE INDEX idx_solicitudes_usuario_estado ON solicitudes(usuario, estado);
+CREATE INDEX idx_reservas_fecha ON reservas_salas(fecha_inicio, fecha_fin);
+CREATE INDEX idx_eventos_fecha ON eventos(fecha_inicio, fecha_fin);
+CREATE INDEX idx_audit_logs_usuario_fecha ON audit_logs(usuario, created_at);
